@@ -1,66 +1,45 @@
 package ru.octol1ttle.damagevignette.common.events;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.platform.GlStateManager.DstFactor;
+import com.mojang.blaze3d.platform.GlStateManager.SrcFactor;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
+
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
 import ru.octol1ttle.damagevignette.common.DamageVignetteCommon;
 import ru.octol1ttle.damagevignette.common.api.Vignette;
 import ru.octol1ttle.damagevignette.common.config.VignetteSettings;
 import ru.octol1ttle.damagevignette.common.util.FloatColor;
 
 public class RenderHudEvent {
-    private static final Identifier VIGNETTE_TEXTURE = new Identifier("damagevignette", "textures/vignette.png");
+    private static final Identifier VIGNETTE_TEXTURE = Identifier.of("damagevignette", "textures/misc/vignette.png");
 
-    public void renderHud(DrawContext graphics) {
+    public void renderHud(DrawContext context) {
         FloatColor color = computeVignetteColor();
         if (color == null) {
             return;
         }
 
-        // Prepare
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.ZERO, GlStateManager.DstFactor.ONE_MINUS_SRC_COLOR, GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.DST_ALPHA);
-
-        // Draw
-        drawVignette(graphics, color);
-
-        // Cleanup
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        graphics.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.defaultBlendFunc();
+        renderVignetteOverlay(context, VIGNETTE_TEXTURE, color);
     }
 
-    private void drawVignette(DrawContext graphics, FloatColor color) {
-        int width = graphics.getScaledWindowWidth();
-        int height = graphics.getScaledWindowHeight();
+    private void renderVignetteOverlay(DrawContext context, Identifier texture, FloatColor color) {
+      RenderSystem.disableDepthTest();
+      RenderSystem.depthMask(false);
+      RenderSystem.enableBlend();
+      RenderSystem.blendFuncSeparate(SrcFactor.ZERO, DstFactor.ONE_MINUS_SRC_COLOR, SrcFactor.ONE, DstFactor.ZERO);
 
-        Matrix4f matrix4f = graphics.getMatrices().peek().getPositionMatrix();
-        BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
-
-        bufferBuilder.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE);
-        bufferBuilder.vertex(matrix4f, 0, 0, -90).color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()).texture(0.0f, 0.0f).next();
-        bufferBuilder.vertex(matrix4f, 0, height, -90).color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()).texture(0.0f, 1.0f).next();
-        bufferBuilder.vertex(matrix4f, width, height, -90).color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()).texture(1.0f, 1.0f).next();
-        bufferBuilder.vertex(matrix4f, width, 0, -90).color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()).texture(1.0f, 0.0f).next();
-
-        RenderSystem.setShader(GameRenderer::getPositionColorTexProgram);
-        RenderSystem.setShaderTexture(0, RenderHudEvent.VIGNETTE_TEXTURE);
-        RenderSystem.setShaderColor(color.getAlpha(), color.getAlpha(), color.getAlpha(), 1.0f);
-
-        BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
-    }
+      context.setShaderColor(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+      context.drawTexture(texture, 0, 0, -90, 0.0F, 0.0F, context.getScaledWindowWidth(), context.getScaledWindowHeight(), context.getScaledWindowWidth(), context.getScaledWindowHeight());
+      
+      RenderSystem.depthMask(true);
+      RenderSystem.enableDepthTest();
+      context.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+      RenderSystem.defaultBlendFunc();
+      RenderSystem.disableBlend();
+   }
 
     private @Nullable FloatColor computeVignetteColor() {
         VignetteSettings activeSettings = null;
